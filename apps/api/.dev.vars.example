@@ -1,0 +1,24 @@
+# ──────────────────────────────────────────────────────────────────
+# apps/api Cloudflare Workers 本機開發 secrets
+# 複製此檔案為 .dev.vars 並填入真實值
+#   cp apps/api/.dev.vars.example apps/api/.dev.vars
+# .dev.vars 已加入 .gitignore，不會被 commit
+#
+# 生產環境請用 wrangler secret put <NAME> 設定
+# ──────────────────────────────────────────────────────────────────
+
+# 管理員 Bearer Token（POST /api/admin 用）
+ADMIN_SECRET=dev-admin-secret-change-in-production
+
+# Supabase
+SUPABASE_URL=https://xxxxxxxxxxxxxxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# Cron 保護（/internal/refresh-markers 用）
+INTERNAL_CRON_SECRET=dev-cron-secret-change-in-production
+
+# IP Hash Salt（防 rainbow table，生產請用隨機長字串）
+IP_HASH_SALT=dev-salt-change-in-production
+
+# Sentry（選填）
+# SENTRY_DSN=https://xxx@sentry.io/xxx

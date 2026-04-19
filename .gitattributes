@@ -1,0 +1,12 @@
+# 統一使用 LF 換行（跨平台一致）
+* text=auto eol=lf
+
+# 二進位檔案不轉換
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.pmtiles binary
+*.woff binary
+*.woff2 binary

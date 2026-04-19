@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand: #003580;
+  --color-brand-secondary: #006CE4;
+  --color-brand-hover: #002860;
+  --color-highlight: #FFB700;
+  --color-price-green: #008009;
+  --color-app-bg: #F5F5F5;
+  --font-sans: var(--font-noto-sans-tc);
+}
+
+body {
+  background: #F5F5F5;
+  color: var(--foreground);
+}
+
+/* MapLibre popup overrides */
+.maplibregl-popup-content {
+  padding: 0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important;
+  overflow: hidden;
+}
+.maplibregl-popup-tip {
+  border-top-color: white !important;
+}
+.maplibregl-popup-close-button {
+  display: none !important;
+}
+.maplibregl-ctrl-attrib {
+  font-size: 10px !important;
+}

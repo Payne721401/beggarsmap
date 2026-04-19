@@ -1,0 +1,50 @@
+name = "beggarsmap-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "KV"
+id = "c86f0d75c8a5493780d0b1f5f5a57ae9"       # 填入 wrangler kv:namespace create "beggarsmap-kv" 後的 ID
+preview_id = "56942d0dba9b4f9793f03317acc074b5"
+
+# R2 Buckets
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "beggarsmap"        # 你的 R2 bucket 名稱
+
+# Queues
+[[queues.producers]]
+binding = "RESTAURANT_QUEUE"
+queue = "restaurant-submissions"
+
+[[queues.producers]]
+binding = "REVIEW_QUEUE"
+queue = "review-submissions"
+
+[[queues.consumers]]
+queue = "restaurant-submissions"
+max_batch_size = 100
+max_batch_timeout = 30
+
+[[queues.consumers]]
+queue = "review-submissions"
+max_batch_size = 100
+max_batch_timeout = 30
+
+# Cron Triggers
+[triggers]
+crons = ["*/10 * * * *"]   # 每 10 分鐘更新 Materialized View
+
+# Secrets（用 wrangler secret put 設定，不放在此）
+# ADMIN_SECRET
+# SUPABASE_URL
+# SUPABASE_SERVICE_ROLE_KEY
+# INTERNAL_CRON_SECRET
+# IP_HASH_SALT
+# SENTRY_DSN
+
+# 非敏感設定
+[vars]
+ENVIRONMENT = "development"

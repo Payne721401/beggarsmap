@@ -1,0 +1,16 @@
+{
+  "name": "beggarsmap",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api dev",
+    "build:web": "pnpm --filter web build",
+    "build:api": "pnpm --filter api build",
+    "type-check": "pnpm --filter web tsc --noEmit && pnpm --filter api tsc --noEmit"
+  }
+}

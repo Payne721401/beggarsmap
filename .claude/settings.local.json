@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(pnpm --version)",
+      "Bash(npm install:*)",
+      "Bash(pnpm create:*)",
+      "Bash(npx create-next-app@latest web --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --no-turbopack)",
+      "Bash(dir \"C:\\\\Users\\\\USER\\\\Desktop\\\\beggarsmap\\\\apps\\\\web\")",
+      "Bash(npm config:*)",
+      "Bash(npm init:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)",
+      "Bash(Test-Path \"C:\\\\Users\\\\USER\\\\Desktop\\\\beggarsmap\\\\apps\\\\web\\\\.env.local\")",
+      "Read(//mnt/c/**)",
+      "Read(//c/Users//**)",
+      "Read(//c//**)"
+    ]
+  }
+}
