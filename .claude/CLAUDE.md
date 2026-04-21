@@ -21,7 +21,7 @@
 ```
 beggarsmap/
 ├── apps/
-│   ├── web/          # Next.js 15
+│   ├── web/          # Next.js 16
 │   └── api/          # Cloudflare Workers (Hono)
 └── packages/
     └── db/           # schema.sql + migrations
