@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@protomaps/basemaps": "^5.7.2",
     "@supabase/supabase-js": "^2.103.0",
     "browser-image-compression": "^2.0.2",
     "maplibre-gl": "^5.22.0",

@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { hasReported, addReport, getPriceVote, setPriceVote } from './reports';
+import { hasReported, addReport, getPriceVote, setPriceVote, getCpVote, setCpVote } from './reports';
 
 // reports.ts 讀取 localStorage，需要 jsdom 環境（vitest.config.ts 已設定 environment: 'jsdom'）
 
 const REPORTS_KEY = 'beggarsmap_reports';
 const PRICE_VOTES_KEY = 'beggarsmap_price_votes';
+const CP_VOTES_KEY = 'beggarsmap_cp_votes';
 
 beforeEach(() => {
   localStorage.clear();
@@ -153,6 +154,88 @@ describe('setPriceVote', () => {
       throw new Error('QuotaExceededError');
     });
     expect(() => setPriceVote('rest-x', 'no')).not.toThrow();
+    vi.restoreAllMocks();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────
+// getCpVote / setCpVote
+// ─────────────────────────────────────────────────────────────────
+describe('getCpVote (SSR)', () => {
+  it('在 SSR 環境回傳 null', () => {
+    vi.stubGlobal('window', undefined);
+    expect(getCpVote('rest-1')).toBeNull();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('getCpVote', () => {
+  it('未投票時回傳 null', () => {
+    expect(getCpVote('rest-1')).toBeNull();
+  });
+
+  it('投票後回傳對應值（high）', () => {
+    setCpVote('rest-1', 'high');
+    expect(getCpVote('rest-1')).toBe('high');
+  });
+
+  it('投票後回傳對應值（low）', () => {
+    setCpVote('rest-1', 'low');
+    expect(getCpVote('rest-1')).toBe('low');
+  });
+
+  it('不同 ID 互不影響', () => {
+    setCpVote('rest-1', 'high');
+    expect(getCpVote('rest-2')).toBeNull();
+  });
+
+  it('localStorage 損壞（非 JSON）時，getCpVote 回傳 null', () => {
+    localStorage.setItem(CP_VOTES_KEY, 'NOT_VALID_JSON');
+    expect(getCpVote('rest-1')).toBeNull();
+  });
+});
+
+describe('setCpVote', () => {
+  it('設定 high', () => {
+    setCpVote('rest-1', 'high');
+    expect(getCpVote('rest-1')).toBe('high');
+  });
+
+  it('設定 low', () => {
+    setCpVote('rest-1', 'low');
+    expect(getCpVote('rest-1')).toBe('low');
+  });
+
+  it('可以覆蓋先前的投票（high → low）', () => {
+    setCpVote('rest-1', 'high');
+    setCpVote('rest-1', 'low');
+    expect(getCpVote('rest-1')).toBe('low');
+  });
+
+  it('可以覆蓋先前的投票（low → high）', () => {
+    setCpVote('rest-1', 'low');
+    setCpVote('rest-1', 'high');
+    expect(getCpVote('rest-1')).toBe('high');
+  });
+
+  it('多個 ID 各自儲存', () => {
+    setCpVote('rest-1', 'high');
+    setCpVote('rest-2', 'low');
+    expect(getCpVote('rest-1')).toBe('high');
+    expect(getCpVote('rest-2')).toBe('low');
+  });
+
+  it('localStorage 損壞（非 JSON）時，setCpVote 仍正常儲存', () => {
+    localStorage.setItem(CP_VOTES_KEY, 'NOT_VALID_JSON');
+    setCpVote('rest-1', 'high');
+    expect(getCpVote('rest-1')).toBe('high');
+  });
+
+  it('localStorage.setItem 拋出例外時，setCpVote 靜默忽略不崩潰', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('QuotaExceededError');
+    });
+    expect(() => setCpVote('rest-x', 'high')).not.toThrow();
     vi.restoreAllMocks();
   });
 });

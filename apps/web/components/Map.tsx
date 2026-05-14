@@ -26,25 +26,57 @@ type Props = {
 const BRAND = '#003580';
 const BRAND_SELECTED = '#006CE4';
 
-/** 畫 Booking.com 風格圓角矩形，回傳 ImageData */
+/** 畫對話框氣泡 marker（圓角矩形 + 底部尖角指向座標，Booking.com 風格），回傳 ImageData */
 function makeTagImage(color: string, pixelRatio: number): ImageData {
-  const W = 28 * pixelRatio;
-  const H = 18 * pixelRatio;
-  const r = 3 * pixelRatio;
+  const W = 40 * pixelRatio;
+  const bodyH = 18 * pixelRatio;
+  const tailH = 6 * pixelRatio;
+  const tailW = 8 * pixelRatio;
+  const r = 4 * pixelRatio;
+  const totalH = bodyH + tailH;
   const canvas = document.createElement('canvas');
   canvas.width = W;
-  canvas.height = H;
+  canvas.height = totalH;
   const ctx = canvas.getContext('2d')!;
-  ctx.beginPath();
-  ctx.moveTo(r, 0);
-  ctx.lineTo(W - r, 0); ctx.quadraticCurveTo(W, 0, W, r);
-  ctx.lineTo(W, H - r); ctx.quadraticCurveTo(W, H, W - r, H);
-  ctx.lineTo(r, H); ctx.quadraticCurveTo(0, H, 0, H - r);
-  ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
-  ctx.closePath();
+
+  // 組合路徑：圓角矩形 body + 底部尖角 tail
+  const drawBubblePath = () => {
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(W - r, 0);
+    ctx.quadraticCurveTo(W, 0, W, r);
+    ctx.lineTo(W, bodyH - r);
+    ctx.quadraticCurveTo(W, bodyH, W - r, bodyH);
+    // 右側到尖角
+    ctx.lineTo(W / 2 + tailW / 2, bodyH);
+    ctx.lineTo(W / 2, totalH);                 // 尖角頂點 = 整張圖最底
+    ctx.lineTo(W / 2 - tailW / 2, bodyH);
+    // 回到左側
+    ctx.lineTo(r, bodyH);
+    ctx.quadraticCurveTo(0, bodyH, 0, bodyH - r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath();
+  };
+
+  // 主體（含 canvas 內建 drop shadow）
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.28)';
+  ctx.shadowBlur = 3 * pixelRatio;
+  ctx.shadowOffsetY = 1 * pixelRatio;
   ctx.fillStyle = color;
+  drawBubblePath();
   ctx.fill();
-  return ctx.getImageData(0, 0, W, H);
+
+  // 白色描邊（取消陰影避免邊也有陰影）
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.25 * pixelRatio;
+  drawBubblePath();
+  ctx.stroke();
+
+  return ctx.getImageData(0, 0, W, totalH);
 }
 
 /** HTML escape for popup content */
@@ -80,14 +112,21 @@ export default function Map({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isReady) return;
-    const filter = (selectedId
+    const showSelectedFilter = (selectedId
       ? ['==', ['get', 'id'], selectedId]
       : ['==', ['get', 'id'], '__none__']) as Parameters<typeof map.setFilter>[1];
     if (map.getLayer('restaurant-points-selected')) {
-      map.setFilter('restaurant-points-selected', filter);
+      map.setFilter('restaurant-points-selected', showSelectedFilter);
     }
     if (map.getLayer('restaurant-selected-label')) {
-      map.setFilter('restaurant-selected-label', filter);
+      map.setFilter('restaurant-selected-label', showSelectedFilter);
+    }
+    // 普通 label：選中時排除該店，避免跟「品項 | 店名」label 文字重疊
+    if (map.getLayer('restaurant-labels')) {
+      const normalLabelFilter = (selectedId
+        ? ['all', ['!', ['has', 'point_count']], ['!=', ['get', 'id'], selectedId]]
+        : ['!', ['has', 'point_count']]) as Parameters<typeof map.setFilter>[1];
+      map.setFilter('restaurant-labels', normalLabelFilter);
     }
   }, [selectedId, isReady]);
 
@@ -144,64 +183,56 @@ export default function Map({
       map.on('load', () => {
         const pr = window.devicePixelRatio || 1;
 
-        // ── 圖示：正常 (深藍) + 選中 (亮藍) ──
+        // ── 圖示：正常 (深藍) + 選中 (亮藍)，含底部尖角 ──
         const tagNormal = makeTagImage(BRAND, pr);
         const tagSelected = makeTagImage(BRAND_SELECTED, pr);
-        const W = 28 * pr, H = 18 * pr, s = 4 * pr;
+        // 9-patch stretch：只允許 body 區域拉伸，尖角保持原始大小
+        const W = 40 * pr, bodyH = 18 * pr, sx = 6 * pr, sy = 4 * pr;
+        const stretchOpts = {
+          stretchX: [[sx, W - sx] as [number, number]],
+          stretchY: [[sy, bodyH - sy] as [number, number]],
+          content: [sx, sy, W - sx, bodyH - sy] as [number, number, number, number],
+          pixelRatio: pr,
+        };
 
-        map.addImage('price-tag', tagNormal, {
-          stretchX: [[s, W - s]], stretchY: [[s, H - s]],
-          content: [s, s, W - s, H - s], pixelRatio: pr,
-        });
-        map.addImage('price-tag-selected', tagSelected, {
-          stretchX: [[s, W - s]], stretchY: [[s, H - s]],
-          content: [s, s, W - s, H - s], pixelRatio: pr,
-        });
+        map.addImage('price-tag', tagNormal, stretchOpts);
+        map.addImage('price-tag-selected', tagSelected, stretchOpts);
 
         // ── GeoJSON Source ──
         map.addSource('restaurants', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
           cluster: true,
-          clusterMaxZoom: 13,
-          clusterRadius: 50,
+          clusterMaxZoom: 17,    // 高縮放層級也保留聚合（避免重疊）
+          clusterRadius: 60,     // 60px 內視為重疊→自動合併
           clusterProperties: {
             min_price: ['min', ['coalesce', ['get', 'price_amount'], ['get', 'price_min'], 9999]],
           },
         });
 
-        // ── Cluster 圓圈 ──
+        // ── Cluster：與一般 marker 同形狀（圓角矩形），顯示「最低價+」 ──
         map.addLayer({
           id: 'clusters',
-          type: 'circle',
-          source: 'restaurants',
-          filter: ['has', 'point_count'],
-          paint: {
-            'circle-color': BRAND,
-            'circle-radius': ['step', ['get', 'point_count'], 20, 10, 26, 30, 34],
-            'circle-stroke-width': 2.5,
-            'circle-stroke-color': '#ffffff',
-            'circle-opacity': 0.92,
-          },
-        });
-
-        // ── Cluster 文字 ──
-        map.addLayer({
-          id: 'cluster-label',
           type: 'symbol',
           source: 'restaurants',
           filter: ['has', 'point_count'],
           layout: {
+            'icon-image': 'price-tag',
+            'icon-text-fit': 'both',
+            'icon-text-fit-padding': [1, 8, 1, 8],
+            'icon-anchor': 'bottom',
+            'icon-allow-overlap': true,
+            'text-allow-overlap': true,
             'text-field': ['case',
               ['<', ['get', 'min_price'], 9000],
-              ['concat', 'TWD ', ['to-string', ['get', 'min_price']], '+'],
-              ['to-string', ['get', 'point_count']],
+              ['concat', '$', ['to-string', ['get', 'min_price']], '+'],
+              ['concat', ['to-string', ['get', 'point_count']], ' 家'],
             ],
-            'text-size': 11,
-            'text-font': ['Noto Sans Regular'],
-            'text-allow-overlap': true,
+            'text-size': 13,
+            'text-font': ['Noto Sans Bold'],
+            'text-letter-spacing': 0.02,
           },
-          paint: { 'text-color': '#fff' },
+          paint: { 'text-color': '#ffffff' },
         });
 
         // ── 個別 Pin：正常 ──
@@ -216,16 +247,18 @@ export default function Map({
           layout: {
             'icon-image': 'price-tag',
             'icon-text-fit': 'both',
-            'icon-text-fit-padding': [5, 9, 5, 9],
+            'icon-text-fit-padding': [1, 8, 1, 8],
+            'icon-anchor': 'bottom',
             'icon-allow-overlap': true,
             'text-allow-overlap': true,
             'text-field': tf(['case',
               ['>', ['coalesce', ['get', 'price_amount'], ['get', 'price_min'], 0], 0],
-              ['concat', 'TWD ', ['to-string', ['coalesce', ['get', 'price_amount'], ['get', 'price_min']]]],
+              ['concat', '$', ['to-string', ['coalesce', ['get', 'price_amount'], ['get', 'price_min']]]],
               '未定價',
             ]),
-            'text-size': 12,
-            'text-font': ['Noto Sans Regular'],
+            'text-size': 13,
+            'text-font': ['Noto Sans Bold'],
+            'text-letter-spacing': 0.02,
           },
           paint: { 'text-color': '#ffffff' },
         });
@@ -239,16 +272,18 @@ export default function Map({
           layout: {
             'icon-image': 'price-tag-selected',
             'icon-text-fit': 'both',
-            'icon-text-fit-padding': [5, 9, 5, 9],
+            'icon-text-fit-padding': [1, 8, 1, 8],
+            'icon-anchor': 'bottom',
             'icon-allow-overlap': true,
             'text-allow-overlap': true,
             'text-field': tf(['case',
               ['>', ['coalesce', ['get', 'price_amount'], ['get', 'price_min'], 0], 0],
-              ['concat', 'TWD ', ['to-string', ['coalesce', ['get', 'price_amount'], ['get', 'price_min']]]],
+              ['concat', '$', ['to-string', ['coalesce', ['get', 'price_amount'], ['get', 'price_min']]]],
               '未定價',
             ]),
-            'text-size': 12,
-            'text-font': ['Noto Sans Regular'],
+            'text-size': 13,
+            'text-font': ['Noto Sans Bold'],
+            'text-letter-spacing': 0.02,
           },
           paint: { 'text-color': '#ffffff' },
         });
@@ -278,7 +313,7 @@ export default function Map({
           },
         });
 
-        // ── 餐廳名稱（zoom 15+） ──
+        // ── 餐廳名稱（zoom 15+，放在 marker 上方） ──
         map.addLayer({
           id: 'restaurant-labels',
           type: 'symbol',
@@ -289,8 +324,8 @@ export default function Map({
             'text-field': tf(['get', 'name']),
             'text-size': 11,
             'text-font': ['Noto Sans Regular'],
-            'text-offset': [0, 1.6],
-            'text-anchor': 'top',
+            'text-offset': [0, -2.8],     // 向上推：marker 約 24px，再多留間距
+            'text-anchor': 'bottom',      // 文字底部對齊到 feature point
             'text-allow-overlap': false,
             'text-optional': true,
           },
@@ -298,11 +333,12 @@ export default function Map({
         });
 
         // ── Hover Popup ──
+        // offset = -30：氣泡底部尖角在座標上，整個氣泡（含尖角）高度約 24px，再加 6px 間距
         hoverPopupRef.current = new maplibregl.Popup({
           closeButton: false,
           closeOnClick: false,
-          offset: [0, -4],
-          maxWidth: '220px',
+          offset: [0, -30],
+          maxWidth: '340px',
         });
 
         const showHoverPopup = (e: MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
@@ -313,18 +349,22 @@ export default function Map({
           const p = f.properties as Record<string, unknown>;
           const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
           const price = p.price_amount ?? p.price_min;
+
+          // 主視覺：價格（大、黑色）+ 品項（中、綠色）
           const priceHtml = price
-            ? `<span style="color:#003580;font-weight:700;font-size:14px">TWD ${price}</span>`
-            : `<span style="color:#999;font-size:13px">未定價</span>`;
+            ? `<span style="color:#1a1a1a;font-weight:800;font-size:28px;line-height:1;letter-spacing:-0.01em">$${price}</span>`
+            : `<span style="color:#999;font-weight:600;font-size:18px">未定價</span>`;
           const itemHtml = p.price_item_name
-            ? `<div style="color:#008009;font-size:12px;margin-top:1px">${esc(p.price_item_name)}</div>`
+            ? `<div style="color:#008009;font-weight:600;font-size:16px;margin-top:8px;line-height:1.3">${esc(p.price_item_name)}</div>`
             : '';
-          const ratingHtml = `<div style="color:#888;font-size:11px;margin-top:3px">乞丐指數 ${Number(p.beggar_index ?? 0).toFixed(1)}/5 · ${p.review_count ?? 0} 則評論</div>`;
+          // 店名 + 乞丐指數：稍微強調（次主要資訊）
+          const nameHtml = `<div style="color:#1a1a1a;font-size:14px;margin-top:12px;font-weight:700">${esc(p.name)}</div>`;
+          const ratingHtml = `<div style="color:#555;font-size:12px;margin-top:3px;font-weight:500">乞丐指數 <span style="color:#003580;font-weight:700">${Number(p.beggar_index ?? 0).toFixed(1)}</span>/5 · ${p.review_count ?? 0} 則評論</div>`;
+
           hoverPopupRef.current!
             .setLngLat(coords)
-            .setHTML(`<div style="padding:10px 14px;font-family:system-ui,sans-serif;background:#fff">
-              <div style="font-weight:700;font-size:13px;color:#1a1a1a;margin-bottom:3px">${esc(p.name)}</div>
-              ${priceHtml}${itemHtml}${ratingHtml}
+            .setHTML(`<div style="padding:16px 20px;font-family:inherit;background:#fff;min-width:220px">
+              ${priceHtml}${itemHtml}${nameHtml}${ratingHtml}
             </div>`)
             .addTo(map);
         };
@@ -388,6 +428,13 @@ export default function Map({
             cover_image_key: (p.cover_image_key as string) || null,
             avg_rating: Number(p.avg_rating ?? 0),
             review_count: Number(p.review_count ?? 0),
+            created_at: (p.created_at as string) || new Date().toISOString(),
+            report_count: Number(p.report_count ?? 0),
+            cp_high_votes: Number(p.cp_high_votes ?? 0),
+            cp_low_votes: Number(p.cp_low_votes ?? 0),
+            price_correct_votes: Number(p.price_correct_votes ?? 0),
+            price_wrong_votes: Number(p.price_wrong_votes ?? 0),
+            favorite_count: Number(p.favorite_count ?? 0),
           };
           onRestaurantClick(marker);
         };

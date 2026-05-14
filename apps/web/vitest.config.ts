@@ -23,6 +23,7 @@ export default defineConfig({
         'lib/chains.ts',
         'lib/reports.ts',
         'lib/favorites.ts',
+        'lib/gmaps-parse.ts',
       ],
       exclude: [
         'lib/api.ts',
